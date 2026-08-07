@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Temporary files
+captcha_debug.png
+profile_debug.png
+
+# Credentials
+.env
