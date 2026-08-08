@@ -17,7 +17,13 @@ from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 
-from .exceptions import LoginFailedError, LoginPageParseError
+from .exceptions import (
+    CaptchaError,
+    CredentialsError,
+    LoginFailedError,
+    LoginPageParseError,
+    InvalidResponseError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +59,8 @@ class Client:
         self._session = requests.Session()
         self._session.headers.update(DEFAULT_HEADERS)
         self._logged_in = False
-        self._reg_id = None
+        self._details: dict | None = None
+        self._today_attendance: list[dict] | None = None
 
     # Load the login page, extract CSRF token and captcha image
     def fetch_login_challenge(self) -> CaptchaChallenge:
@@ -128,9 +135,7 @@ class Client:
         soup = BeautifulSoup(resp.text, "html.parser")
         error_text = self._extract_error_message(soup)
         raise LoginFailedError(
-            error_text
-            or "Login failed for an unknown reason (still on the login page). "
-            "Likely a wrong captcha reading or expired token — try again."
+            error_text or "Login failed for an unknown reason — try again."
         )
 
     # Check if login was successful
@@ -145,46 +150,61 @@ class Client:
     # Extract error message from the login page
     @staticmethod
     def _extract_error_message(soup: BeautifulSoup) -> Optional[str]:
-        candidates = soup.select(".field-validation-error .validation-summary-errors")
-        for el in candidates:
-            text = el.get_text(strip=True)
+        captcha_error = soup.select_one(".field-validation-error")
+        if captcha_error:
+            text = captcha_error.get_text(strip=True)
             if text:
-                return text
+                raise CaptchaError(text)
+
+        credentials_error = soup.select_one(".validation-summary-errors")
+        if credentials_error:
+            text = credentials_error.get_text(strip=True)
+            if text:
+                raise CredentialsError(text)
+
         return None
 
     @property
     def is_logged_in(self) -> bool:
         return self._logged_in
 
-    # @property
-    # def student_details(self) -> dict:
-    #     return self._get_student_details()
+    @property
+    def student_details(self) -> dict:
+        if not self._details:
+            self.get_student_details()
+        return self._details
 
-    # @property
-    # def today_attendance(self) -> list[dict]:
-    #     if not self._reg_id:
-    #         self._get_student_details()
-    #     return self._get_today_attendance()
+    @property
+    def today_attendance(self) -> list[dict]:
+        if not self._today_attendance:
+            if not self._details:
+                self.get_student_details()
+            self.get_today_attendance()
+        return self._today_attendance
 
     # Authenticated data fetches
-    def get_student_details(self) -> dict:
+    def get_student_details(self) -> int:
         resp = self._session.post(f"{BASE_URL}/{STUDENT_DETAILS_PATH}", timeout=5)
         resp.raise_for_status()
 
         logger.info("POST [%d] %s", resp.status_code, resp.url)
 
-        data = resp.json()
-        details = json.loads(data["state"])[0]
+        try:
+            data = resp.json()
+            details = json.loads(data["state"])[0]
+        except json.JSONDecodeError:
+            raise InvalidResponseError("Failed to parse student details.")
+
         self.photo = base64.b64decode(details.get("Photo"))
         details.pop("Photo", None)
-        self._reg_id = details.get("RegID")
 
-        return details
+        self._details = details
+        return 0
 
-    def get_today_attendance(self) -> list[dict]:
+    def get_today_attendance(self) -> int:
         today = datetime.now().strftime("%d/%m/%Y")
         payload = {
-            "RegID": self._reg_id,
+            "RegID": self._details.get("RegID"),
             "date": today,
         }
 
@@ -195,7 +215,11 @@ class Client:
 
         logger.info("POST [%d] %s", resp.status_code, resp.url)
 
-        data = resp.json()
-        attendance = json.loads(data["state"])
+        try:
+            data = resp.json()
+            attendance = json.loads(data["state"])
+        except json.JSONDecodeError:
+            raise InvalidResponseError("Failed to parse attendance data.")
 
-        return attendance
+        self._today_attendance = attendance
+        return 0

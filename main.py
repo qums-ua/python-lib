@@ -8,12 +8,13 @@ you to type the code.
 import logging
 import sys
 
-from qums_fetch import config, Client, Error
+from qums_fetch import config, Client, CaptchaSolver, Error
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 CAPTCHA_DUMP_PATH = "captcha_debug.png"
+CAPTCHA_BW_DUMP_PATH = "captcha_bw.png"
 PROFILE_DUMP_PATH = "profile_debug.png"
 
 
@@ -23,20 +24,16 @@ def main() -> int:
     client = Client(config.USERNAME, config.PASSWORD)
 
     # Load the login page and extract captcha image
-    try:
-        challenge = client.fetch_login_challenge()
-    except Error as e:
-        logger.error("Failed to load login page: %s", e)
-        return 1
+    challenge = client.fetch_login_challenge()
 
     # Save captch image to disk
     with open(CAPTCHA_DUMP_PATH, "wb") as f:
         f.write(challenge.image_bytes)
-    logger.info(
-        "Captcha image saved to '%s' — open it and read the code.", CAPTCHA_DUMP_PATH
-    )
+    logger.info("Captcha image saved to '%s'", CAPTCHA_DUMP_PATH)
 
-    captcha_value = input("> Enter captcha text: ").strip()
+    # Solve captcha (OCR or manual)
+    solver = CaptchaSolver(challenge.image_bytes, CAPTCHA_BW_DUMP_PATH)
+    captcha_value = solver.guess()
 
     # Submit solved captcha
     try:
@@ -48,10 +45,10 @@ def main() -> int:
     logger.info("Logged in successfully as %s.", config.USERNAME)
 
     # Fetch student deatails
-    print(client.get_student_details())
+    print(client.student_details)
 
     # Fetch today's attendance
-    print(client.get_today_attendance())
+    print(client.today_attendance)
 
     return 0
 

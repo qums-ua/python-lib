@@ -27,3 +27,14 @@ class CredentialsError(LoginFailedError):
     'validation-summary-errors' element) while the captcha itself was
     accepted. Retrying with a new captcha won't help — the credentials
     need to change."""
+
+
+class InvalidResponseError(Error):
+    """The server returned a response we couldn't parse (e.g. JSON
+    expected but got HTML). Usually means the site's markup changed or
+    the ERP is down."""
+
+
+class BlankCaptchaError(Error):
+    """The image looked like an empty/placeholder captcha rather than
+    real text — retry with a fresh fetch rather than trying to OCR it."""
