@@ -28,9 +28,6 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://qums.quantumuniversity.edu.in"
-STUDENT_MENU_PATH = "Account/Cyborg_StudentMenu"
-STUDENT_DETAILS_PATH = "Account/GetStudentDetail"
-ATTENDANCE_PATH = "Web_StudentAcademic/GetTodayAttendance"
 FEEDBACK_PATH = "IQAC/Cyborg_CO_FeedBack"
 
 CAPTCHA_IMG_SELECTOR = "#imgPhoto"
@@ -60,7 +57,10 @@ class Client:
         self._session.headers.update(DEFAULT_HEADERS)
         self._logged_in = False
         self._details: dict | None = None
+        self._tile_data: list[dict] | None = None
         self._today_attendance: list[dict] | None = None
+        self._month_attendance: dict | None = None
+        self._sem_attendance: list[dict] | None = None
 
     # Load the login page, extract CSRF token and captcha image
     def fetch_login_challenge(self) -> CaptchaChallenge:
@@ -175,6 +175,14 @@ class Client:
         return self._details
 
     @property
+    def tile_data(self) -> list[dict]:
+        if not self._tile_data:
+            if not self._details:
+                self.get_student_details()
+            self.get_tile_data()
+        return self._tile_data
+
+    @property
     def today_attendance(self) -> list[dict]:
         if not self._today_attendance:
             if not self._details:
@@ -182,9 +190,25 @@ class Client:
             self.get_today_attendance()
         return self._today_attendance
 
+    @property
+    def month_attendance(self) -> dict:
+        if not self._month_attendance:
+            if not self._details:
+                self.get_student_details()
+            self.get_month_attendance()
+        return self._month_attendance
+
+    @property
+    def sem_attendance(self) -> list[dict]:
+        if not self._sem_attendance:
+            if not self._details:
+                self.get_student_details()
+            self.get_sem_attendance()
+        return self._sem_attendance
+
     # Authenticated data fetches
     def get_student_details(self) -> int:
-        resp = self._session.post(f"{BASE_URL}/{STUDENT_DETAILS_PATH}", timeout=5)
+        resp = self._session.post(f"{BASE_URL}/Account/GetStudentDetail", timeout=5)
         resp.raise_for_status()
 
         logger.info("POST [%d] %s", resp.status_code, resp.url)
@@ -201,6 +225,29 @@ class Client:
         self._details = details
         return 0
 
+    def get_tile_data(self) -> int:
+        payload = {
+            "RegID": self._details.get("RegID"),
+        }
+
+        resp = self._session.post(
+            f"{BASE_URL}/Web_StudentAcademic/GetStudentTileData",
+            data=payload,
+            timeout=5,
+        )
+        resp.raise_for_status()
+
+        logger.info("POST [%d] %s", resp.status_code, resp.url)
+
+        try:
+            data = resp.json()
+            tile_data = json.loads(data["state"])
+        except json.JSONDecodeError:
+            raise InvalidResponseError("Failed to parse tile data.")
+
+        self._tile_data = tile_data
+        return 0
+
     def get_today_attendance(self) -> int:
         today = datetime.now().strftime("%d/%m/%Y")
         payload = {
@@ -209,7 +256,9 @@ class Client:
         }
 
         resp = self._session.post(
-            f"{BASE_URL}/{ATTENDANCE_PATH}", data=payload, timeout=5
+            f"{BASE_URL}/Web_StudentAcademic/GetTodayAttendance",
+            data=payload,
+            timeout=5,
         )
         resp.raise_for_status()
 
@@ -222,4 +271,59 @@ class Client:
             raise InvalidResponseError("Failed to parse attendance data.")
 
         self._today_attendance = attendance
+        return 0
+
+    def get_month_attendance(self, month: int | None = None) -> int:
+        if month is None:
+            month = datetime.now().month
+        payload = {
+            "RegID": self._details.get("RegID"),
+            "Month": month,
+        }
+
+        resp = self._session.post(
+            f"{BASE_URL}/Web_StudentAcademic/GetMonthRegister",
+            data=payload,
+            timeout=5,
+        )
+        resp.raise_for_status()
+
+        logger.info("POST [%d] %s", resp.status_code, resp.url)
+
+        try:
+            data = resp.json()
+            month_attendance = {
+                "overview": json.loads(data["data"][0]),
+                "details": json.loads(data["state"]),
+            }
+        except json.JSONDecodeError:
+            raise InvalidResponseError("Failed to parse month attendance data.")
+
+        self._month_attendance = month_attendance
+        return 0
+
+    def get_sem_attendance(self, sem: int | None = None) -> int:
+        if sem is None:
+            sem = self._details.get("YearSem")
+        payload = {
+            "RegID": self._details.get("RegID"),
+            "YearSem": sem,
+        }
+
+        resp = self._session.post(
+            f"{BASE_URL}/Web_StudentAcademic/GetYearSemWiseAttendance",
+            data=payload,
+            timeout=5,
+        )
+        resp.raise_for_status()
+
+        logger.info("POST [%d] %s", resp.status_code, resp.url)
+
+        try:
+            data = resp.json()
+            sem_attendance = json.loads(data["data"])
+        except json.JSONDecodeError:
+            raise InvalidResponseError("Failed to parse semester attendance data.")
+
+        self._sem_attendance = sem_attendance
         return 0

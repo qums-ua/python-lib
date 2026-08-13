@@ -47,8 +47,17 @@ def main() -> int:
     # Fetch student deatails
     print(client.student_details)
 
+    # Fetch tile data
+    print(client.tile_data)
+
     # Fetch today's attendance
     print(client.today_attendance)
+
+    # Fetch monthly attendance
+    print(client.month_attendance)
+
+    # Fetch semester attendance
+    print(client.sem_attendance)
 
     return 0
 
