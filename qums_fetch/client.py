@@ -293,7 +293,7 @@ class Client:
         try:
             data = resp.json()
             month_attendance = {
-                "overview": json.loads(data["data"][0]),
+                "overview": json.loads(data["data"])[0],
                 "details": json.loads(data["state"]),
             }
         except json.JSONDecodeError:
