@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
+from pathlib import Path
 
 import pytesseract
 from PIL import Image
@@ -42,13 +43,18 @@ logger = logging.getLogger(__name__)
 
 
 class CaptchaSolver:
-    def __init__(self, image_bytes: bytes, bw_dump_path: str):
+    def __init__(self, image_bytes: bytes, img_path: str | None = None):
         self.psm: int = 7
         self.allowed_chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         self.threshold: int = 128
         self.bg_frac: float = 0.001
         self.image_bytes: bytes = image_bytes
-        self.bw_dump_path: str = bw_dump_path
+        self.img_dump_path: Path | None = Path(img_path) if img_path else None
+        self.bw_dump_path: Path | None = (
+            Path(f"{self.img_dump_path.parent}/bw_{self.img_dump_path.name}")
+            if self.img_dump_path
+            else None
+        )
 
     @property
     def config(self) -> str:
@@ -70,6 +76,12 @@ class CaptchaSolver:
         return non_background_fraction < self.bg_frac
 
     def _solve_captcha(self) -> str:
+        if self.img_dump_path:
+            self.img_dump_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.img_dump_path, "wb") as image_file:
+                image_file.write(self.image_bytes)
+            logger.info("Saved captcha image to '%s'", self.img_dump_path)
+
         bw = self._preprocess(self.image_bytes)
 
         if self.bw_dump_path:

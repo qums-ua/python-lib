@@ -23,13 +23,12 @@ The script downloads the login captcha, runs OCR on it, and then prints student 
 ## Usage
 
 ```python
-from qums_fetch import CaptchaSolver, Client, config
+from qums_fetch import CaptchaSolver, Client
 
-config.validate()
-client = Client(config.USERNAME, config.PASSWORD)
+client = Client(USERNAME, PASSWORD)
 challenge = client.fetch_login_challenge()
 
-solver = CaptchaSolver(challenge.image_bytes, "captcha_bw.png")
+solver = CaptchaSolver(challenge.image_bytes)
 captcha_value = solver.guess()
 
 client.submit_login(challenge, captcha_value)

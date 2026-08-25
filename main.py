@@ -1,8 +1,7 @@
 """
-Confirms the login flow (session, CSRF token, form submission) works
-end-to-end before we wire up OCR. Loads credentials from .env, saves
-the captcha image to disk so you can open and read it, then prompts
-you to type the code.
+Confirms the login flow (session, CSRF token, form submission) and OCR
+captcha solving work end to end. Loads credentials from .env, solves the
+captcha in memory, and prints the fetched dashboard data.
 """
 
 import logging
@@ -15,10 +14,6 @@ from qums_fetch import Client, CaptchaSolver, Error
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-
-CAPTCHA_DUMP_PATH = "captcha_debug.png"
-CAPTCHA_BW_DUMP_PATH = "captcha_bw.png"
-PROFILE_DUMP_PATH = "profile_debug.png"
 
 
 def main() -> int:
@@ -33,14 +28,8 @@ def main() -> int:
     # Load the login page and extract captcha image
     challenge = client.fetch_login_challenge()
 
-    # Save captch image to disk
-    with open(CAPTCHA_DUMP_PATH, "wb") as f:
-        f.write(challenge.image_bytes)
-    logger.info("Captcha image saved to '%s'", CAPTCHA_DUMP_PATH)
-
     try:
-        # Solve captcha (OCR or manual)
-        solver = CaptchaSolver(challenge.image_bytes, CAPTCHA_BW_DUMP_PATH)
+        solver = CaptchaSolver(challenge.image_bytes)
         captcha_value = solver.guess()
 
         # Submit solved captcha
