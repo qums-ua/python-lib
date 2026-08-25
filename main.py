@@ -38,12 +38,12 @@ def main() -> int:
         f.write(challenge.image_bytes)
     logger.info("Captcha image saved to '%s'", CAPTCHA_DUMP_PATH)
 
-    # Solve captcha (OCR or manual)
-    solver = CaptchaSolver(challenge.image_bytes, CAPTCHA_BW_DUMP_PATH)
-    captcha_value = solver.guess()
-
-    # Submit solved captcha
     try:
+        # Solve captcha (OCR or manual)
+        solver = CaptchaSolver(challenge.image_bytes, CAPTCHA_BW_DUMP_PATH)
+        captcha_value = solver.guess()
+
+        # Submit solved captcha
         client.submit_login(challenge, captcha_value)
     except Error as e:
         logger.error("Login failed: %s", e)

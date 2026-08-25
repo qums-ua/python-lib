@@ -19,7 +19,7 @@ from io import BytesIO
 import pytesseract
 from PIL import Image
 
-from .exceptions import BlankCaptchaError
+from .exceptions import BlankCaptchaError, CaptchaError
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +88,9 @@ class CaptchaSolver:
 
     def guess(self) -> str:
         try:
-            guess = self._solve_captcha()
-        except BlankCaptchaError as e:
-            logger.error("%s", e)
+            return self._solve_captcha()
+        except BlankCaptchaError:
+            raise
         except Exception as e:
             logger.error("%s", e)
-            logger.info("OCR raised an unexpected error, falling back to manual.")
-
-        return guess
+            raise CaptchaError("Could not solve captcha.") from e
