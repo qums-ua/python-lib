@@ -6,9 +6,12 @@ you to type the code.
 """
 
 import logging
+import os
 import sys
 
-from qums_fetch import config, Client, CaptchaSolver, Error
+from dotenv import load_dotenv
+
+from qums_fetch import Client, CaptchaSolver, Error
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -19,9 +22,13 @@ PROFILE_DUMP_PATH = "profile_debug.png"
 
 
 def main() -> int:
-    config.validate()
+    # Load credentials
+    load_dotenv()
+    username = os.getenv("QUMS_USERNAME")
+    password = os.getenv("QUMS_PASSWORD")
 
-    client = Client(config.USERNAME, config.PASSWORD)
+    # Create client instance
+    client = Client(username, password)
 
     # Load the login page and extract captcha image
     challenge = client.fetch_login_challenge()
@@ -42,7 +49,7 @@ def main() -> int:
         logger.error("Login failed: %s", e)
         return 1
 
-    logger.info("Logged in successfully as %s.", config.USERNAME)
+    logger.info("Logged in successfully as %s.", username)
 
     # Fetch student deatails
     print(client.student_details)

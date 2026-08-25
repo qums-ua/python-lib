@@ -51,6 +51,7 @@ class CaptchaChallenge:
 
 class Client:
     def __init__(self, username: str, password: str):
+        self._validate_credentials(username, password)
         self.username = username
         self._password = password
         self._session = requests.Session()
@@ -61,6 +62,11 @@ class Client:
         self._today_attendance: list[dict] | None = None
         self._month_attendance: dict | None = None
         self._sem_attendance: list[dict] | None = None
+
+    @staticmethod
+    def _validate_credentials(username: str, password: str) -> None:
+        if not username or not password:
+            raise ValueError("Username and password are required.")
 
     # Load the login page, extract CSRF token and captcha image
     def fetch_login_challenge(self) -> CaptchaChallenge:
