@@ -18,20 +18,16 @@ uv sync
 uv run main.py
 ```
 
-The script downloads the login captcha, runs OCR on it, and then prints student details and today's attendance after login succeeds.
+The script creates a client, logs in automatically, and then prints student details and attendance.
 
 ## Usage
 
 ```python
-from qums_fetch import CaptchaSolver, Client
+from qums_fetch import Client
 
 client = Client(USERNAME, PASSWORD)
-challenge = client.fetch_login_challenge()
-
-solver = CaptchaSolver(challenge.image_bytes)
-captcha_value = solver.guess()
-
-client.submit_login(challenge, captcha_value)
+print(client.student_details)
+print(client.today_attendance)
 ```
 
 ## Credits

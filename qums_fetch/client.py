@@ -17,7 +17,9 @@ from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 
+from .captcha import CaptchaSolver
 from .exceptions import (
+    BlankCaptchaError,
     CaptchaError,
     CredentialsError,
     LoginFailedError,
@@ -50,8 +52,15 @@ class CaptchaChallenge:
 
 
 class Client:
-    def __init__(self, username: str, password: str):
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        auto_login: bool = True,
+        login_retries: int = 3,
+    ):
         self._validate_credentials(username, password)
+        self._validate_login_retries(login_retries)
         self.username = username
         self._password = password
         self._session = requests.Session()
@@ -63,10 +72,48 @@ class Client:
         self._month_attendance: dict | None = None
         self._sem_attendance: list[dict] | None = None
 
+        if auto_login:
+            self.login(max_attempts=login_retries)
+
     @staticmethod
     def _validate_credentials(username: str, password: str) -> None:
         if not username or not password:
             raise ValueError("Username and password are required.")
+
+    @staticmethod
+    def _validate_retries(login_retries: int) -> None:
+        if login_retries < 1:
+            raise ValueError("login_retries must be greater than 0.")
+
+    # Automated login flow
+    def login(self, max_attempts: int = 3) -> bool:
+        self._validate_retries(max_attempts)
+
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                challenge = self.fetch_login_challenge()
+                solver = CaptchaSolver(challenge.image_bytes)
+                captcha_value = solver.guess()
+                return self.submit_login(challenge, captcha_value)
+
+            # User error
+            except CredentialsError as err:
+                raise err
+
+            # Server error
+            except (BlankCaptchaError, CaptchaError, LoginFailedError) as err:
+                last_error = err
+                logger.warning(
+                    "Login attempt %d/%d failed: %s",
+                    attempt,
+                    max_attempts,
+                    err,
+                )
+
+        raise LoginFailedError(
+            f"Auto login failed after {max_attempts} attempts."
+        ) from last_error
 
     # Load the login page, extract CSRF token and captcha image
     def fetch_login_challenge(self) -> CaptchaChallenge:
