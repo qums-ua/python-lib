@@ -60,7 +60,7 @@ class Client:
         login_retries: int = 3,
     ):
         self._validate_credentials(username, password)
-        self._validate_login_retries(login_retries)
+        self._validate_retries(login_retries)
         self.username = username
         self._password = password
         self._session = requests.Session()
