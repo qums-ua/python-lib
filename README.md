@@ -2,6 +2,21 @@
 
 Automatically fetch student data from QUMS
 
+## Prerequisites
+
+[Tesseract OCR](https://github.com/tesseract-ocr/tesseract) must be installed on your system for captcha solving:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install tesseract-ocr
+
+# macOS
+brew install tesseract
+
+# Windows
+scoop install tesseract
+```
+
 ## Quick start
 
 Create a `.env` file with:
@@ -11,10 +26,10 @@ QUMS_USERNAME=your_username
 QUMS_PASSWORD=your_password
 ```
 
-Then install dependencies:
+Then install the package:
 
 ```bash
-uv sync
+pip install qums-fetch
 ```
 
 ## Usage
