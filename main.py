@@ -6,7 +6,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from qums_fetch import Client, Error
+from src.qums_fetch import Client, Error
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
