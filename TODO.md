@@ -1,13 +1,13 @@
 ### In Progress
 
 - [ ] Implement remaining API functions
-- [ ] Save cookies across sessions
 - [ ] Write API documentation
 - [ ] Split `client.py` into multiple modules
 - [ ] Release project as a standalone library
 
 ### Completed
 
+- [x] Save cookies across sessions
 - [x] Solve captch using tesseract
 
 ### API Coverage

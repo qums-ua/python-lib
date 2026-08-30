@@ -73,7 +73,59 @@ class Client:
         self._sem_attendance: list[dict] | None = None
 
         if auto_login:
-            self.login(max_attempts=login_retries)
+            if self._load_session() and self._is_session_valid():
+                self._logged_in = True
+                logger.info("Session restored, login skipped.")
+            else:
+                self.login(max_attempts=login_retries)
+
+    @property
+    def _cookie_path(self) -> str:
+        return f"cookies_{self.username}.json"
+
+    # Save session cookies
+    def _save_session(self) -> None:
+        with open(self._cookie_path, "w") as f:
+            cookies = self._session.cookies.get_dict()
+            json.dump(cookies, f)
+        logger.info("Session saved to %s", self._cookie_path)
+
+    # Load session cookies
+    def _load_session(self) -> bool:
+        try:
+            with open(self._cookie_path) as f:
+                data = json.load(f)
+                cookies = data
+            self._session.cookies.update(cookies)
+            return True
+        except FileNotFoundError, json.JSONDecodeError, KeyError:
+            return False
+
+    # Check if the session is valid
+    def _is_session_valid(self) -> bool:
+        try:
+            resp = self._session.post(f"{BASE_URL}/Account/GetStudentDetail", timeout=5)
+            data = resp.json()
+            json.loads(data["state"])
+            return True
+        except Exception:
+            return False
+
+    # Re-login if session is expired
+    def _ensure_session(self) -> None:
+        if self._logged_in and self._is_session_valid():
+            return
+        logger.info("Session expired, re-logging in.")
+        self._clear_cached_data()
+        self.login()
+
+    # Clear saved data
+    def _clear_cached_data(self) -> None:
+        self._details = None
+        self._tile_data = None
+        self._today_attendance = None
+        self._month_attendance = None
+        self._sem_attendance = None
 
     @staticmethod
     def _validate_credentials(username: str, password: str) -> None:
@@ -183,6 +235,7 @@ class Client:
             if FEEDBACK_PATH in resp.url:
                 logger.info("Skipped the course feedback survey")
             self._logged_in = True
+            self._save_session()
             return True
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -261,6 +314,7 @@ class Client:
 
     # Authenticated data fetches
     def get_student_details(self) -> int:
+        self._ensure_session()
         resp = self._session.post(f"{BASE_URL}/Account/GetStudentDetail", timeout=5)
         resp.raise_for_status()
 
@@ -279,6 +333,7 @@ class Client:
         return 0
 
     def get_tile_data(self) -> int:
+        self._ensure_session()
         payload = {
             "RegID": self._details.get("RegID"),
         }
@@ -302,6 +357,7 @@ class Client:
         return 0
 
     def get_today_attendance(self) -> int:
+        self._ensure_session()
         today = datetime.now().strftime("%d/%m/%Y")
         payload = {
             "RegID": self._details.get("RegID"),
@@ -327,6 +383,7 @@ class Client:
         return 0
 
     def get_month_attendance(self, month: int | None = None) -> int:
+        self._ensure_session()
         if month is None:
             month = datetime.now().month
         payload = {
@@ -356,6 +413,7 @@ class Client:
         return 0
 
     def get_sem_attendance(self, sem: int | None = None) -> int:
+        self._ensure_session()
         if sem is None:
             sem = self._details.get("YearSem")
         payload = {
