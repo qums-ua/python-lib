@@ -11,14 +11,11 @@ QUMS_USERNAME=your_username
 QUMS_PASSWORD=your_password
 ```
 
-Then run the smoke test script:
+Then install dependencies:
 
 ```bash
 uv sync
-uv run main.py
 ```
-
-The script creates a client, logs in automatically, and then prints student details and attendance.
 
 ## Usage
 
