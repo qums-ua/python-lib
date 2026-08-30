@@ -1,6 +1,6 @@
 # qums.py
 
-Small Python client for the QUMS ERP dashboard.
+Automatically fetch student data from QUMS
 
 ## Quick start
 
