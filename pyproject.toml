@@ -7,7 +7,9 @@ name = "qums-fetch"
 version = "0.4.3"
 description = "Login and fetch data from QUMS-ERP Dashboard"
 readme = "README.md"
-authors = [{ name = "Ishaan Gupta", email = "ishaan.ishu@proton.me" }]
+authors = [
+    { name = "Ishaan Gupta", email = "ishaan.ishu@proton.me" }
+]
 requires-python = ">=3.14"
 dependencies = [
     "beautifulsoup4>=4.15.0",
@@ -20,6 +22,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.16.5",
 ]
 
 [tool.pytest.ini_options]

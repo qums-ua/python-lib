@@ -14,7 +14,7 @@ QUMS_PASSWORD = os.getenv("QUMS_PASSWORD")
 
 pytestmark = pytest.mark.skipif(
     not (QUMS_USERNAME and QUMS_PASSWORD),
-    reason="QUMS credentials not set in .env",
+    reason="Credentials not set in .env",
 )
 
 
