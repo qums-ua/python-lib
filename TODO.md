@@ -3,10 +3,10 @@
 - [ ] Implement remaining API functions
 - [ ] Write API documentation
 - [ ] Split `client.py` into multiple modules
-- [ ] Release project as a standalone library
 
 ### Completed
 
+- [x] Release project as a standalone library
 - [x] Save cookies across sessions
 - [x] Solve captch using tesseract
 

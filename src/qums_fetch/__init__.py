@@ -1,24 +1,24 @@
-from .client import CaptchaChallenge, Client
 from .captcha import CaptchaSolver
+from .client import CaptchaChallenge, Client
 from .exceptions import (
+    BlankCaptchaError,
     CaptchaError,
     CredentialsError,
+    Error,
+    InvalidResponseError,
     LoginFailedError,
     LoginPageParseError,
-    InvalidResponseError,
-    BlankCaptchaError,
-    Error,
 )
 
 __all__ = [
-    "Client",
-    "CaptchaChallenge",
-    "CaptchaSolver",
-    "CaptchaError",
-    "CredentialsError",
-    "LoginPageParseError",
-    "LoginFailedError",
-    "InvalidResponseError",
     "BlankCaptchaError",
+    "CaptchaChallenge",
+    "CaptchaError",
+    "CaptchaSolver",
+    "Client",
+    "CredentialsError",
     "Error",
+    "InvalidResponseError",
+    "LoginFailedError",
+    "LoginPageParseError",
 ]

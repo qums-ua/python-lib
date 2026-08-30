@@ -7,12 +7,11 @@ etc.) are stored and replayed automatically, same as a browser would.
 from __future__ import annotations
 
 import base64
-import logging
 import json
+import logging
 import re
-from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional
+from datetime import UTC, datetime
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,9 +21,9 @@ from .exceptions import (
     BlankCaptchaError,
     CaptchaError,
     CredentialsError,
+    InvalidResponseError,
     LoginFailedError,
     LoginPageParseError,
-    InvalidResponseError,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,7 +107,7 @@ class Client:
             data = resp.json()
             json.loads(data["state"])
             return True
-        except Exception:
+        except requests.RequestException, json.JSONDecodeError, KeyError:
             return False
 
     # Re-login if session is expired
@@ -150,8 +149,8 @@ class Client:
                 return self.submit_login(challenge, captcha_value)
 
             # User error
-            except CredentialsError as err:
-                raise err
+            except CredentialsError:
+                raise
 
             # Server error
             except (BlankCaptchaError, CaptchaError, LoginFailedError) as err:
@@ -255,7 +254,7 @@ class Client:
 
     # Extract error message from the login page
     @staticmethod
-    def _extract_error_message(soup: BeautifulSoup) -> Optional[str]:
+    def _extract_error_message(soup: BeautifulSoup) -> str | None:
         captcha_error = soup.select_one(".field-validation-error")
         if captcha_error:
             text = captcha_error.get_text(strip=True)
@@ -358,7 +357,7 @@ class Client:
 
     def get_today_attendance(self) -> int:
         self._ensure_session()
-        today = datetime.now().strftime("%d/%m/%Y")
+        today = datetime.now(tz=UTC).strftime("%d/%m/%Y")
         payload = {
             "RegID": self._details.get("RegID"),
             "date": today,
@@ -385,7 +384,7 @@ class Client:
     def get_month_attendance(self, month: int | None = None) -> int:
         self._ensure_session()
         if month is None:
-            month = datetime.now().month
+            month = datetime.now(tz=UTC).month
         payload = {
             "RegID": self._details.get("RegID"),
             "Month": month,
