@@ -5,7 +5,7 @@
 1. Clone the repo and sync dependencies:
 
    ```bash
-   git clone https://github.com/user/qums-fetch.git
+   git clone https://github.com/qums-ua/qums-fetch.git
    cd qums-fetch
    uv sync
    ```
