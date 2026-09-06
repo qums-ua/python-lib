@@ -161,7 +161,7 @@ class Client:
                 f"Could not find hidden input '{TOKEN_INPUT_NAME}' on the login page. "
                 "The site's markup may have changed."
             )
-        token = token_input["value"]
+        token = str(token_input["value"])
 
         img_tag = soup.select_one(CAPTCHA_IMG_SELECTOR)
         if not img_tag or not img_tag.get("src"):
@@ -170,7 +170,7 @@ class Client:
                 "The site's markup may have changed."
             )
 
-        src = img_tag["src"]
+        src = str(img_tag["src"])
         match = re.match(r"data:(image/\w+);base64,(.+)", src, re.DOTALL)
         if not match:
             raise LoginPageParseError(
@@ -238,7 +238,8 @@ class Client:
     def _extract_error_message(soup: BeautifulSoup) -> str | None:
         error_div = soup.select_one(".validation-summary-errors")
         if error_div:
-            error_text = error_div.select_one("li").get_text(strip=True)
+            list_item = error_div.select_one("li")
+            error_text = list_item.get_text(strip=True) if list_item else ""
             if "password" and "incorrect" in error_text:
                 raise CredentialsError(error_text)
             else:
@@ -258,6 +259,8 @@ class Client:
     def student_details(self) -> dict:
         if not self._details:
             self.get_student_details()
+
+        assert self._details is not None
         return self._details
 
     @property
@@ -266,6 +269,8 @@ class Client:
             if not self._details:
                 self.get_student_details()
             self.get_tile_data()
+
+        assert self._tile_data is not None
         return self._tile_data
 
     @property
@@ -274,6 +279,8 @@ class Client:
             if not self._details:
                 self.get_student_details()
             self.get_today_attendance()
+
+        assert self._today_attendance is not None
         return self._today_attendance
 
     @property
@@ -282,6 +289,8 @@ class Client:
             if not self._details:
                 self.get_student_details()
             self.get_month_attendance()
+
+        assert self._month_attendance is not None
         return self._month_attendance
 
     @property
@@ -290,6 +299,8 @@ class Client:
             if not self._details:
                 self.get_student_details()
             self.get_sem_attendance()
+
+        assert self._sem_attendance is not None
         return self._sem_attendance
 
     # Authenticated data fetches
@@ -314,6 +325,8 @@ class Client:
 
     def get_tile_data(self) -> int:
         self._ensure_session()
+        assert self._details is not None
+
         payload = {
             "RegID": self._details.get("RegID"),
         }
@@ -338,6 +351,8 @@ class Client:
 
     def get_today_attendance(self) -> int:
         self._ensure_session()
+        assert self._details is not None
+
         today = datetime.now(tz=UTC).strftime("%d/%m/%Y")
         payload = {
             "RegID": self._details.get("RegID"),
@@ -364,6 +379,8 @@ class Client:
 
     def get_month_attendance(self, month: int | None = None) -> int:
         self._ensure_session()
+        assert self._details is not None
+
         if month is None:
             month = datetime.now(tz=UTC).month
         payload = {
@@ -394,6 +411,8 @@ class Client:
 
     def get_sem_attendance(self, sem: int | None = None) -> int:
         self._ensure_session()
+        assert self._details is not None
+
         if sem is None:
             sem = self._details.get("YearSem")
         payload = {

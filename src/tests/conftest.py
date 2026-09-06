@@ -20,6 +20,9 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="session")
 def client():
+    assert QUMS_USERNAME is not None
+    assert QUMS_PASSWORD is not None
+
     c = Client(QUMS_USERNAME, QUMS_PASSWORD)
     assert c.is_logged_in, "Client failed to log in"
     return c
