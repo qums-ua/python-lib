@@ -15,13 +15,13 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "pillow>=12.3.0",
     "pytesseract>=0.3.13",
-    "python-dotenv>=1.2.2",
     "requests>=2.34.2",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "python-dotenv>=1.2.3",
     "ruff>=0.16.5",
 ]
 
