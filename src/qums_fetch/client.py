@@ -245,7 +245,7 @@ class Client:
 
     # Check if login was successful
     def _looks_like_login_success(self, resp: requests.Response) -> bool:
-        if resp.url == BASE_URL:
+        if resp.url.rstrip("/") == BASE_URL:
             soup = BeautifulSoup(resp.text, "html.parser")
             still_has_captcha = soup.select_one(CAPTCHA_IMG_SELECTOR) is not None
             return not still_has_captcha
@@ -255,17 +255,13 @@ class Client:
     # Extract error message from the login page
     @staticmethod
     def _extract_error_message(soup: BeautifulSoup) -> str | None:
-        captcha_error = soup.select_one(".field-validation-error")
-        if captcha_error:
-            text = captcha_error.get_text(strip=True)
-            if text:
-                raise CaptchaError(text)
-
-        credentials_error = soup.select_one(".validation-summary-errors")
-        if credentials_error:
-            text = credentials_error.get_text(strip=True)
-            if text:
-                raise CredentialsError(text)
+        error_div = soup.select_one(".validation-summary-errors")
+        if error_div:
+            error_text = error_div.select_one("li").get_text(strip=True)
+            if "password" and "incorrect" in error_text:
+                raise CredentialsError(error_text)
+            else:
+                raise CaptchaError(error_text)
 
         return None
 
