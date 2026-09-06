@@ -57,6 +57,7 @@ class Client:
         password: str,
         auto_login: bool = True,
         login_retries: int = 3,
+        cookies: dict | None = None,
     ):
         self._validate_credentials(username, password)
         self._validate_retries(login_retries)
@@ -71,43 +72,24 @@ class Client:
         self._month_attendance: dict | None = None
         self._sem_attendance: list[dict] | None = None
 
+        if cookies:
+            self._session.cookies.update(cookies)
+
         if auto_login:
-            if self._load_session() and self._is_session_valid():
+            if self._is_session_valid():
                 self._logged_in = True
                 logger.info("Session restored, login skipped.")
             else:
                 self.login(max_attempts=login_retries)
 
-    @property
-    def _cookie_path(self) -> str:
-        return f"cookies_{self.username}.json"
-
-    # Save session cookies
-    def _save_session(self) -> None:
-        with open(self._cookie_path, "w") as f:
-            cookies = self._session.cookies.get_dict()
-            json.dump(cookies, f)
-        logger.info("Session saved to %s", self._cookie_path)
-
-    # Load session cookies
-    def _load_session(self) -> bool:
-        try:
-            with open(self._cookie_path) as f:
-                data = json.load(f)
-                cookies = data
-            self._session.cookies.update(cookies)
-            return True
-        except FileNotFoundError, json.JSONDecodeError, KeyError:
-            return False
-
     # Check if the session is valid
     def _is_session_valid(self) -> bool:
         try:
-            resp = self._session.post(f"{BASE_URL}/Account/GetStudentDetail", timeout=5)
-            data = resp.json()
-            json.loads(data["state"])
-            return True
-        except requests.RequestException, json.JSONDecodeError, KeyError:
+            resp = self._session.post(
+                f"{BASE_URL}/Account/GetStudentDetail", timeout=5, allow_redirects=False
+            )
+            return resp.status_code == 200
+        except requests.RequestException:
             return False
 
     # Re-login if session is expired
@@ -234,7 +216,6 @@ class Client:
             if FEEDBACK_PATH in resp.url:
                 logger.info("Skipped the course feedback survey")
             self._logged_in = True
-            self._save_session()
             return True
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -268,6 +249,10 @@ class Client:
     @property
     def is_logged_in(self) -> bool:
         return self._logged_in
+
+    @property
+    def get_cookies(self) -> dict:
+        return self._session.cookies.get_dict()
 
     @property
     def student_details(self) -> dict:
