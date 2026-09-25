@@ -10,11 +10,13 @@ import base64
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
 
 from .captcha import CaptchaSolver
 from .exceptions import (
@@ -58,11 +60,13 @@ class Client:
         auto_login: bool = True,
         login_retries: int = 3,
         cookies: dict | None = None,
+        ocr: Callable[[Image.Image], str] | None = None,
     ):
         self._validate_credentials(username, password)
         self._validate_retries(login_retries)
         self.username = username
         self._password = password
+        self._ocr = ocr
         self._session = requests.Session()
         self._session.headers.update(DEFAULT_HEADERS)
         self._logged_in = False
@@ -126,7 +130,7 @@ class Client:
         for attempt in range(1, max_attempts + 1):
             try:
                 challenge = self.fetch_login_challenge()
-                solver = CaptchaSolver(challenge.image_bytes)
+                solver = CaptchaSolver(challenge.image_bytes, ocr=self._ocr)
                 captcha_value = solver.guess()
                 return self.submit_login(challenge, captcha_value)
 

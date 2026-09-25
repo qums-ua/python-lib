@@ -4,7 +4,7 @@ Automatically fetch student data from QUMS
 
 ## Prerequisites
 
-[Tesseract OCR](https://github.com/tesseract-ocr/tesseract) must be installed on your system for captcha solving:
+[Tesseract OCR ](https://github.com/tesseract-ocr/tesseract) must be installed on your system for captcha solving:
 
 ```bash
 # Ubuntu/Debian
@@ -34,10 +34,13 @@ pip install qums-fetch
 
 ## Usage
 
+> ![NOTE]
+> Captchas are solved with Tesseract by default. To use a different engine, pass an `ocr` callable to `Client`. It accepts a `PIL.Image` and return a string.
+
 ```python
 from qums_fetch import Client
 
-client = Client(USERNAME, PASSWORD)
+client = Client(USERNAME, PASSWORD, optional_ocr)
 print(client.student_details)
 print(client.today_attendance)
 ```

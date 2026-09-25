@@ -7,13 +7,13 @@ Pipeline (must stay in sync with the extension if the site's captcha
 style ever changes):
   1. Grayscale via standard luminosity weights (0.299R + 0.587G + 0.114B)
   2. Hard binary threshold at 128 — no gray, pure black/white
-  3. Tesseract with an alphanumeric whitelist and PSM 7 (treat the whole
-     image as a single line of text, not a page of paragraphs)
+  3. Text recognition as a single line (PSM 7) over an alphanumeric whitelist
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
 
@@ -43,12 +43,18 @@ logger = logging.getLogger(__name__)
 
 
 class CaptchaSolver:
-    def __init__(self, image_bytes: bytes, img_path: str | None = None):
+    def __init__(
+        self,
+        image_bytes: bytes,
+        img_path: str | None = None,
+        ocr: Callable[[Image.Image], str] | None = None,
+    ):
         self.psm: int = 7
         self.allowed_chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         self.threshold: int = 128
         self.bg_frac: float = 0.001
         self.image_bytes: bytes = image_bytes
+        self.ocr: Callable[[Image.Image], str] | None = ocr
         self.img_dump_path: Path | None = Path(img_path) if img_path else None
         self.bw_dump_path: Path | None = (
             Path(f"{self.img_dump_path.parent}/bw_{self.img_dump_path.name}")
@@ -94,7 +100,12 @@ class CaptchaSolver:
                 "skipping OCR. Fetch a fresh challenge and try again."
             )
 
-        text = pytesseract.image_to_string(bw, config=self.config).strip()
+        if self.ocr is not None:
+            text = self.ocr(bw)
+        else:
+            text = pytesseract.image_to_string(bw, config=self.config)
+
+        text = text.strip()
         logger.info("OCR result: %r", text)
         return text
 
