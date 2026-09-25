@@ -34,7 +34,7 @@ pip install qums-fetch
 
 ## Usage
 
-> ![NOTE]
+> [!NOTE]
 > Captchas are solved with Tesseract by default. To use a different engine, pass an `ocr` callable to `Client`. It accepts a `PIL.Image` and return a string.
 
 ```python
