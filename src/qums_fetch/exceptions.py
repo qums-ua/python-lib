@@ -3,38 +3,24 @@ class Error(Exception):
 
 
 class LoginPageParseError(Error):
-    """The login page's HTML didn't contain what we expected (token or
-    captcha image). Usually means the site's markup changed."""
+    """The login page did not contain a usable token and captcha image."""
 
 
 class LoginFailedError(Error):
-    """The login POST didn't land on the student menu, for a reason we
-    couldn't attribute to a specific field. Prefer CaptchaError or
-    CredentialsError below when the page tells us which — this is the
-    fallback for anything else (ERP-side error, unexpected markup)."""
+    """The server rejected the login or the client ran out of attempts."""
 
 
 class CaptchaError(LoginFailedError):
-    """The captcha reading was wrong (page showed a
-    'field-validation-error' element). Retry with a fresh captcha —
-    this tells you nothing about whether the credentials were correct,
-    since the ERP validates captcha before it ever checks credentials
-    and won't report a credentials error while captcha is wrong."""
+    """The client could not solve the captcha or the server rejected its answer."""
 
 
 class CredentialsError(LoginFailedError):
-    """Username/password were rejected (page showed a
-    'validation-summary-errors' element) while the captcha itself was
-    accepted. Retrying with a new captcha won't help — the credentials
-    need to change."""
+    """The server rejected the username or password."""
 
 
 class InvalidResponseError(Error):
-    """The server returned a response we couldn't parse (e.g. JSON
-    expected but got HTML). Usually means the site's markup changed or
-    the ERP is down."""
+    """The server returned data in an unexpected format."""
 
 
 class BlankCaptchaError(Error):
-    """The image looked like an empty/placeholder captcha rather than
-    real text — retry with a fresh fetch rather than trying to OCR it."""
+    """The captcha image appeared blank."""

@@ -1,5 +1,3 @@
-"""Tests for GetStudentTileData endpoint."""
-
 REQUIRED_KEYS = [
     "AttendPer",
     "DueAmount",
@@ -16,7 +14,7 @@ REQUIRED_KEYS = [
 
 
 def test_has_required_keys(client):
-    tile = client.tile_data
+    tile = client.student.tile_data
     assert isinstance(tile, list)
     assert len(tile) >= 1
 
@@ -27,7 +25,7 @@ def test_has_required_keys(client):
 
 
 def test_field_types(client):
-    entry = client.tile_data[0]
+    entry = client.student.tile_data[0]
     assert isinstance(entry["AttendPer"], (int, float))
     assert isinstance(entry["DueAmount"], (int, float))
     assert isinstance(entry["Result"], str)

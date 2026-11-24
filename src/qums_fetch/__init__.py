@@ -1,5 +1,6 @@
+from ._internal.login import CaptchaChallenge
 from .captcha import CaptchaSolver
-from .client import CaptchaChallenge, Client
+from .client import Client
 from .exceptions import (
     BlankCaptchaError,
     CaptchaError,

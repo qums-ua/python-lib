@@ -2,13 +2,13 @@
 
 - [ ] Implement remaining API functions
 - [ ] Write API documentation
-- [ ] Split `client.py` into multiple modules
 
 ### Completed
 
 - [x] Release project as a standalone library
 - [x] Save cookies across sessions
-- [x] Solve captch using tesseract
+- [x] Solve captchas using Tesseract
+- [x] Split `client.py` into multiple modules
 
 ### API Coverage
 

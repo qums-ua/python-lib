@@ -1,5 +1,3 @@
-"""Tests for GetTodayAttendance endpoint."""
-
 import pytest
 
 REQUIRED_KEYS = [
@@ -15,7 +13,7 @@ REQUIRED_KEYS = [
 
 
 def test_has_required_keys(client):
-    attendance = client.today_attendance
+    attendance = client.attendance.today
     assert isinstance(attendance, list)
 
     if len(attendance) == 0:
@@ -28,7 +26,7 @@ def test_has_required_keys(client):
 
 
 def test_field_types(client):
-    attendance = client.today_attendance
+    attendance = client.attendance.today
     if len(attendance) == 0:
         pytest.skip("No attendance records for today")
 
