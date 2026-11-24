@@ -1,5 +1,3 @@
-"""Tests for GetStudentDetail endpoint."""
-
 REQUIRED_KEYS = [
     "RegID",
     "StudentID",
@@ -23,14 +21,14 @@ REQUIRED_KEYS = [
 
 
 def test_has_required_keys(client):
-    details = client.student_details
+    details = client.student.details
     assert isinstance(details, dict)
     for key in REQUIRED_KEYS:
         assert key in details, f"Missing key: {key}"
 
 
 def test_field_types(client):
-    details = client.student_details
+    details = client.student.details
     assert isinstance(details["RegID"], int)
     assert isinstance(details["StudentID"], str)
     assert isinstance(details["StudentName"], str)

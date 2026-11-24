@@ -1,5 +1,3 @@
-"""Tests for GetYearSemWiseAttendance endpoint."""
-
 REQUIRED_KEYS = [
     "Subject",
     "SubjectCode",
@@ -17,7 +15,7 @@ REQUIRED_KEYS = [
 
 
 def test_has_required_keys(client):
-    sem = client.sem_attendance
+    sem = client.attendance.semester
     assert isinstance(sem, list)
     assert len(sem) >= 1
 
@@ -28,7 +26,7 @@ def test_has_required_keys(client):
 
 
 def test_field_types(client):
-    entry = client.sem_attendance[0]
+    entry = client.attendance.semester[0]
     assert isinstance(entry["Subject"], str)
     assert isinstance(entry["SubjectCode"], str)
     assert isinstance(entry["TotalLecture"], int)

@@ -25,6 +25,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.14", "3.15"]
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,9 +40,6 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Install Tesseract OCR
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
-
       - name: Ruff check
         run: uv run ruff check
 
@@ -50,8 +49,15 @@ jobs:
       - name: Type check
         run: uv run ty check
 
-      - name: Run tests
+      - name: Run offline tests
         run: uv run pytest
+
+      - name: Run live tests when credentials are available
         env:
           QUMS_USERNAME: ${{ secrets.QUMS_USERNAME }}
           QUMS_PASSWORD: ${{ secrets.QUMS_PASSWORD }}
+        run: |
+          if [[ -n "$QUMS_USERNAME" && -n "$QUMS_PASSWORD" ]]; then
+            sudo apt-get update && sudo apt-get install -y tesseract-ocr
+            uv run pytest tests/integration
+          fi

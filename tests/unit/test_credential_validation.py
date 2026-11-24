@@ -1,5 +1,3 @@
-"""Tests for Client input validation (no network required)."""
-
 import pytest
 
 from qums_fetch import Client

@@ -1,10 +1,8 @@
-"""Tests for GetMonthRegister endpoint."""
-
 import pytest
 
 
 def test_overview_structure(client):
-    month_att = client.month_attendance
+    month_att = client.attendance.month
     assert isinstance(month_att, dict)
     assert "overview" in month_att
     assert "details" in month_att
@@ -18,7 +16,7 @@ def test_overview_structure(client):
 
 
 def test_details_structure(client):
-    details = client.month_attendance["details"]
+    details = client.attendance.month["details"]
     assert isinstance(details, list)
 
     if len(details) == 0:

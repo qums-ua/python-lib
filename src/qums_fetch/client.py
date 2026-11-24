@@ -1,41 +1,28 @@
-"""
-QUMS ERP client — handles the login flow using a persistent
-requests.Session so cookies (ASP.NET_SessionId, the CSRF cookie half,
-etc.) are stored and replayed automatically, same as a browser would.
-"""
-
-from __future__ import annotations
-
-import base64
-import json
 import logging
-import re
-from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from collections.abc import Callable, Mapping
 
 import requests
-from bs4 import BeautifulSoup
 from PIL import Image
 
+from ._internal.login import (
+    TOKEN_INPUT_NAME,
+    CaptchaChallenge,
+    check_login_response,
+    parse_challenge,
+)
+from ._internal.responses import Row
+from .attendance import Attendance
 from .captcha import CaptchaSolver
 from .exceptions import (
     BlankCaptchaError,
-    CaptchaError,
     CredentialsError,
-    InvalidResponseError,
     LoginFailedError,
-    LoginPageParseError,
 )
+from .student import Student
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://qums.quantumuniversity.edu.in"
-FEEDBACK_PATH = "IQAC/Cyborg_CO_FeedBack"
-
-CAPTCHA_IMG_SELECTOR = "#imgPhoto"
-TOKEN_INPUT_NAME = "__RequestVerificationToken"
-
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -45,13 +32,6 @@ DEFAULT_HEADERS = {
 }
 
 
-@dataclass
-class CaptchaChallenge:
-    token: str
-    image_bytes: bytes
-    image_mime: str
-
-
 class Client:
     def __init__(
         self,
@@ -59,385 +39,115 @@ class Client:
         password: str,
         auto_login: bool = True,
         login_retries: int = 3,
-        cookies: dict | None = None,
+        cookies: Mapping[str, str | None] | None = None,
         ocr: Callable[[Image.Image], str] | None = None,
     ):
-        self._validate_credentials(username, password)
-        self._validate_retries(login_retries)
+        if not username or not password:
+            raise ValueError("Username and password are required.")
+        if login_retries < 1:
+            raise ValueError("login_retries must be greater than 0.")
+
         self.username = username
         self._password = password
+        self._login_retries = login_retries
         self._ocr = ocr
         self._session = requests.Session()
         self._session.headers.update(DEFAULT_HEADERS)
         self._logged_in = False
-        self._details: dict | None = None
-        self._tile_data: list[dict] | None = None
-        self._today_attendance: list[dict] | None = None
-        self._month_attendance: dict | None = None
-        self._sem_attendance: list[dict] | None = None
+        self.student = Student(self)
+        self.attendance = Attendance(self)
 
         if cookies:
-            self._session.cookies.update(cookies)
-
+            for name, value in cookies.items():
+                self._session.cookies.set(name, value)
         if auto_login:
-            if self._is_session_valid():
+            if cookies and self.student._check_session() is not None:
                 self._logged_in = True
-                logger.info("Session restored, login skipped.")
+                logger.info("Session restored from cookies.")
             else:
-                self.login(max_attempts=login_retries)
+                self.login()
 
-    # Check if the session is valid
-    def _is_session_valid(self) -> bool:
-        try:
-            resp = self._session.post(
-                f"{BASE_URL}/Account/GetStudentDetail", timeout=5, allow_redirects=False
-            )
-            return resp.status_code == 200
-        except requests.RequestException:
-            return False
-
-    # Re-login if session is expired
-    def _ensure_session(self) -> None:
-        if self._logged_in and self._is_session_valid():
-            return
-        logger.info("Session expired, re-logging in.")
-        self._clear_cached_data()
-        self.login()
-
-    # Clear saved data
     def _clear_cached_data(self) -> None:
-        self._details = None
-        self._tile_data = None
-        self._today_attendance = None
-        self._month_attendance = None
-        self._sem_attendance = None
+        self.student._clear_cache()
+        self.attendance._clear_cache()
 
-    @staticmethod
-    def _validate_credentials(username: str, password: str) -> None:
-        if not username or not password:
-            raise ValueError("Username and password are required.")
+    def _ensure_session(self) -> Row | None:
+        if self._logged_in:
+            details = self.student._check_session()
+            if details is not None:
+                return details
+            logger.info("Session expired, re-logging in.")
+        self.login()
+        return None
 
-    @staticmethod
-    def _validate_retries(login_retries: int) -> None:
-        if login_retries < 1:
-            raise ValueError("login_retries must be greater than 0.")
+    def login(self, max_attempts: int | None = None) -> bool:
+        if max_attempts is None:
+            max_attempts = self._login_retries
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be greater than 0.")
 
-    # Automated login flow
-    def login(self, max_attempts: int = 3) -> bool:
-        self._validate_retries(max_attempts)
-
+        self._logged_in = False
+        self._clear_cached_data()
         last_error: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             try:
                 challenge = self.fetch_login_challenge()
                 solver = CaptchaSolver(challenge.image_bytes, ocr=self._ocr)
-                captcha_value = solver.guess()
-                return self.submit_login(challenge, captcha_value)
-
-            # User error
+                return self.submit_login(challenge, solver.guess())
             except CredentialsError:
                 raise
-
-            # Server error
-            except (BlankCaptchaError, CaptchaError, LoginFailedError) as err:
-                last_error = err
+            except (BlankCaptchaError, LoginFailedError) as exc:
+                last_error = exc
                 logger.warning(
-                    "Login attempt %d/%d failed: %s",
-                    attempt,
-                    max_attempts,
-                    err,
+                    "Login attempt %d/%d failed: %s", attempt, max_attempts, exc
                 )
 
         raise LoginFailedError(
-            f"Auto login failed after {max_attempts} attempts."
+            f"Login failed after {max_attempts} attempts."
         ) from last_error
 
-    # Load the login page, extract CSRF token and captcha image
     def fetch_login_challenge(self) -> CaptchaChallenge:
-        resp = self._session.get(BASE_URL, timeout=15)
-        resp.raise_for_status()
+        response = self._session.get(BASE_URL, timeout=15)
+        response.raise_for_status()
+        return parse_challenge(response.text)
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        token_input = soup.find("input", {"name": TOKEN_INPUT_NAME})
-        if not token_input or not token_input.get("value"):
-            raise LoginPageParseError(
-                f"Could not find hidden input '{TOKEN_INPUT_NAME}' on the login page. "
-                "The site's markup may have changed."
-            )
-        token = str(token_input["value"])
-
-        img_tag = soup.select_one(CAPTCHA_IMG_SELECTOR)
-        if not img_tag or not img_tag.get("src"):
-            raise LoginPageParseError(
-                f"Could not find captcha image at selector '{CAPTCHA_IMG_SELECTOR}'. "
-                "The site's markup may have changed."
-            )
-
-        src = str(img_tag["src"])
-        match = re.match(r"data:(image/\w+);base64,(.+)", src, re.DOTALL)
-        if not match:
-            raise LoginPageParseError(
-                "Captcha image src wasn't a base64 data URI as expected. "
-                f"Got: {src[:60]}..."
-            )
-        image_mime, b64_data = match.groups()
-        image_bytes = base64.b64decode(b64_data)
-
-        logger.info(
-            "Fetched login challenge: token acquired, %s captcha image (%d KBs)",
-            image_mime,
-            len(image_bytes) // 1024,
-        )
-
-        return CaptchaChallenge(
-            token=token, image_bytes=image_bytes, image_mime=image_mime
-        )
-
-    # Submit the login form with a solved captcha
     def submit_login(self, challenge: CaptchaChallenge, captcha_value: str) -> bool:
-        payload = {
-            "hdnMsg": "QGC",
-            "checkOnline": "0",
-            "__RequestVerificationToken": challenge.token,
-            "UserName": self.username,
-            "Password": self._password,
-            "clientIP": "~~~~~",
-            "captcha": captcha_value,
-        }
-
-        resp = self._session.post(
+        response = self._session.post(
             BASE_URL,
-            data=payload,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={
+                "hdnMsg": "QGC",
+                "checkOnline": "0",
+                TOKEN_INPUT_NAME: challenge.token,
+                "UserName": self.username,
+                "Password": self._password,
+                "clientIP": "~~~~~",
+                "captcha": captcha_value,
+            },
             timeout=5,
             allow_redirects=False,
         )
-        resp.raise_for_status()
+        response.raise_for_status()
+        check_login_response(response.text)
 
-        if self._looks_like_login_success(resp):
-            logger.info("Login succeeded, landed on %s", resp.url)
-            if FEEDBACK_PATH in resp.url:
-                logger.info("Skipped the course feedback survey")
-            self._logged_in = True
-            return True
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        error_text = self._extract_error_message(soup)
-        raise LoginFailedError(
-            error_text or "Login failed for an unknown reason — try again."
-        )
-
-    # Check if login was successful
-    def _looks_like_login_success(self, resp: requests.Response) -> bool:
-        if resp.url.rstrip("/") == BASE_URL:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            still_has_captcha = soup.select_one(CAPTCHA_IMG_SELECTOR) is not None
-            return not still_has_captcha
-
+        self._clear_cached_data()
+        self._logged_in = True
+        logger.info("Login succeeded.")
         return True
-
-    # Extract error message from the login page
-    @staticmethod
-    def _extract_error_message(soup: BeautifulSoup) -> str | None:
-        error_div = soup.select_one(".validation-summary-errors")
-        if error_div:
-            list_item = error_div.select_one("li")
-            error_text = list_item.get_text(strip=True) if list_item else ""
-            if "password" and "incorrect" in error_text:
-                raise CredentialsError(error_text)
-            else:
-                raise CaptchaError(error_text)
-
-        return None
 
     @property
     def is_logged_in(self) -> bool:
         return self._logged_in
 
     @property
-    def get_cookies(self) -> dict:
+    def get_cookies(self) -> dict[str, str | None]:
         return self._session.cookies.get_dict()
 
-    @property
-    def student_details(self) -> dict:
-        if not self._details:
-            self.get_student_details()
-
-        assert self._details is not None
-        return self._details
-
-    @property
-    def tile_data(self) -> list[dict]:
-        if not self._tile_data:
-            if not self._details:
-                self.get_student_details()
-            self.get_tile_data()
-
-        assert self._tile_data is not None
-        return self._tile_data
-
-    @property
-    def today_attendance(self) -> list[dict]:
-        if not self._today_attendance:
-            if not self._details:
-                self.get_student_details()
-            self.get_today_attendance()
-
-        assert self._today_attendance is not None
-        return self._today_attendance
-
-    @property
-    def month_attendance(self) -> dict:
-        if not self._month_attendance:
-            if not self._details:
-                self.get_student_details()
-            self.get_month_attendance()
-
-        assert self._month_attendance is not None
-        return self._month_attendance
-
-    @property
-    def sem_attendance(self) -> list[dict]:
-        if not self._sem_attendance:
-            if not self._details:
-                self.get_student_details()
-            self.get_sem_attendance()
-
-        assert self._sem_attendance is not None
-        return self._sem_attendance
-
-    # Authenticated data fetches
-    def get_student_details(self) -> int:
-        self._ensure_session()
-        resp = self._session.post(f"{BASE_URL}/Account/GetStudentDetail", timeout=5)
-        resp.raise_for_status()
-
-        logger.info("POST [%d] %s", resp.status_code, resp.url)
-
-        try:
-            data = resp.json()
-            details = json.loads(data["state"])[0]
-        except json.JSONDecodeError:
-            raise InvalidResponseError("Failed to parse student details.")
-
-        self.photo = base64.b64decode(details.get("Photo"))
-        details.pop("Photo", None)
-
-        self._details = details
-        return 0
-
-    def get_tile_data(self) -> int:
-        self._ensure_session()
-        assert self._details is not None
-
-        payload = {
-            "RegID": self._details.get("RegID"),
-        }
-
-        resp = self._session.post(
-            f"{BASE_URL}/Web_StudentAcademic/GetStudentTileData",
-            data=payload,
-            timeout=5,
+    def _post(
+        self, path: str, data: dict[str, str | int] | None = None
+    ) -> requests.Response:
+        response = self._session.post(
+            f"{BASE_URL}/{path}", data=data, timeout=5, allow_redirects=False
         )
-        resp.raise_for_status()
-
-        logger.info("POST [%d] %s", resp.status_code, resp.url)
-
-        try:
-            data = resp.json()
-            tile_data = json.loads(data["state"])
-        except json.JSONDecodeError:
-            raise InvalidResponseError("Failed to parse tile data.")
-
-        self._tile_data = tile_data
-        return 0
-
-    def get_today_attendance(self) -> int:
-        self._ensure_session()
-        assert self._details is not None
-
-        today = datetime.now(tz=UTC).strftime("%d/%m/%Y")
-        payload = {
-            "RegID": self._details.get("RegID"),
-            "date": today,
-        }
-
-        resp = self._session.post(
-            f"{BASE_URL}/Web_StudentAcademic/GetTodayAttendance",
-            data=payload,
-            timeout=5,
-        )
-        resp.raise_for_status()
-
-        logger.info("POST [%d] %s", resp.status_code, resp.url)
-
-        try:
-            data = resp.json()
-            attendance = json.loads(data["state"])
-        except json.JSONDecodeError:
-            raise InvalidResponseError("Failed to parse attendance data.")
-
-        self._today_attendance = attendance
-        return 0
-
-    def get_month_attendance(self, month: int | None = None) -> int:
-        self._ensure_session()
-        assert self._details is not None
-
-        if month is None:
-            month = datetime.now(tz=UTC).month
-        payload = {
-            "RegID": self._details.get("RegID"),
-            "Month": month,
-        }
-
-        resp = self._session.post(
-            f"{BASE_URL}/Web_StudentAcademic/GetMonthRegister",
-            data=payload,
-            timeout=5,
-        )
-        resp.raise_for_status()
-
-        logger.info("POST [%d] %s", resp.status_code, resp.url)
-
-        try:
-            data = resp.json()
-            month_attendance = {
-                "overview": json.loads(data["data"])[0],
-                "details": json.loads(data["state"]),
-            }
-        except json.JSONDecodeError:
-            raise InvalidResponseError("Failed to parse month attendance data.")
-
-        self._month_attendance = month_attendance
-        return 0
-
-    def get_sem_attendance(self, sem: int | None = None) -> int:
-        self._ensure_session()
-        assert self._details is not None
-
-        if sem is None:
-            sem = self._details.get("YearSem")
-        payload = {
-            "RegID": self._details.get("RegID"),
-            "YearSem": sem,
-        }
-
-        resp = self._session.post(
-            f"{BASE_URL}/Web_StudentAcademic/GetYearSemWiseAttendance",
-            data=payload,
-            timeout=5,
-        )
-        resp.raise_for_status()
-
-        logger.info("POST [%d] %s", resp.status_code, resp.url)
-
-        try:
-            data = resp.json()
-            sem_attendance = json.loads(data["data"])
-        except json.JSONDecodeError:
-            raise InvalidResponseError("Failed to parse semester attendance data.")
-
-        self._sem_attendance = sem_attendance
-        return 0
+        logger.info("POST [%d] %s", response.status_code, response.url)
+        response.raise_for_status()
+        return response
