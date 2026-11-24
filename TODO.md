@@ -31,4 +31,4 @@
 | `Web_StudentAcademic/GetStudentAssignment`     | Get available assignments                  |   🕑   |
 | `Web_Teaching/GetUploadStudentAssignment`      | Get uploaded assignments                   |   🕑   |
 | `Web_StudentAcademic/GetStudentSubject`        | Get subject details                        |   🕑   |
-| `/Web_Exam/GetStudentInternalMarks`            | Get midsem marks                           |   🕑   |
+| `Web_Exam/GetStudentInternalMarks`             | Get midsem marks                           |   🕑   |
