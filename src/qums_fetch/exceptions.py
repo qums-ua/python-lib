@@ -22,5 +22,9 @@ class InvalidResponseError(Error):
     """The server returned data in an unexpected format."""
 
 
+class AssignmentUploadError(Error):
+    """The server reported that the assignment upload was unsuccessful."""
+
+
 class BlankCaptchaError(Error):
     """The captcha image appeared blank."""

@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable, Mapping
+from typing import BinaryIO
 
 import requests
 from PIL import Image
@@ -11,6 +12,7 @@ from ._internal.login import (
     parse_challenge,
 )
 from ._internal.responses import Row
+from .assignment import Assignment
 from .attendance import Attendance
 from .captcha import CaptchaSolver
 from .exceptions import (
@@ -56,6 +58,7 @@ class Client:
         self._logged_in = False
         self.student = Student(self)
         self.attendance = Attendance(self)
+        self.assignment = Assignment(self)
 
         if cookies:
             for name, value in cookies.items():
@@ -70,6 +73,7 @@ class Client:
     def _clear_cached_data(self) -> None:
         self.student._clear_cache()
         self.attendance._clear_cache()
+        self.assignment._clear_cache()
 
     def _ensure_session(self) -> Row | None:
         if self._logged_in:
@@ -143,11 +147,22 @@ class Client:
         return self._session.cookies.get_dict()
 
     def _post(
-        self, path: str, data: dict[str, str | int] | None = None
+        self,
+        path: str,
+        data: dict[str, str | int] | None = None,
+        *,
+        files: dict[str, tuple[str, BinaryIO, str]] | None = None,
+        timeout: int = 5,
     ) -> requests.Response:
         response = self._session.post(
-            f"{BASE_URL}/{path}", data=data, timeout=5, allow_redirects=False
+            f"{BASE_URL}/{path}",
+            data=data,
+            files=files,
+            timeout=timeout,
+            allow_redirects=False,
         )
-        logger.info("POST [%d] %s", response.status_code, response.url)
+        logger.info(
+            "POST [%d] %s/%s", response.status_code, BASE_URL, path.partition("?")[0]
+        )
         response.raise_for_status()
         return response

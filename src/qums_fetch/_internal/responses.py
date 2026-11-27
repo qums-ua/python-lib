@@ -1,3 +1,4 @@
+import base64
 import json
 from typing import Any
 
@@ -26,3 +27,13 @@ def read_first_row(response: Response, field: str = "state") -> Row:
     if not rows:
         raise InvalidResponseError(f"Expected a record in {field!r}.")
     return rows[0]
+
+
+def read_base64(row: Row, field: str) -> bytes:
+    value = row.get(field)
+    if not isinstance(value, str) or not (encoded := "".join(value.split())):
+        raise InvalidResponseError(f"Expected a non-empty base64 string in {field!r}.")
+    try:
+        return base64.b64decode(encoded, validate=True)
+    except ValueError as exc:
+        raise InvalidResponseError(f"{field!r} contains invalid base64.") from exc

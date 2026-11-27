@@ -28,7 +28,10 @@
 | `Web_StudentAcademic/GetStudentDuesDetail`     | Get due dates (academic)                   |   🕑   |
 | `Web_StudentAcademic/GetSLctStuEventDetail`    | Get event participation details            |   🕑   |
 | `Web_StudentAcademic/FillStudentTimeTable`     | Get timetable                              |   🕑   |
-| `Web_StudentAcademic/GetStudentAssignment`     | Get available assignments                  |   🕑   |
-| `Web_Teaching/GetUploadStudentAssignment`      | Get uploaded assignments                   |   🕑   |
+| `Web_StudentAcademic/GetStudentAssignment`     | Get available assignments                  |   ✅   |
+| `Web_Teaching/GetAssignmentImage`              | Download assignment                        |   ✅   |
+| `Web_Teaching/GetUploadStudentAssignment`      | Get uploaded assignments                   |   ✅   |
+| `Web_Teaching/GetUploadedAssignmentDocument`   | Download uploaded assignment               |   ✅   |
+| `Web_Teaching/UploadStudentAssignment`         | Upload assignment                          |   ✅   |
 | `Web_StudentAcademic/GetStudentSubject`        | Get subject details                        |   🕑   |
 | `Web_Exam/GetStudentInternalMarks`             | Get midsem marks                           |   🕑   |
