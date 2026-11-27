@@ -1,35 +1,13 @@
-import json
 from unittest.mock import Mock
 
 import pytest
-import requests
 
 from qums_fetch import CaptchaChallenge, Client, InvalidResponseError
 from qums_fetch.client import BASE_URL
 
 
-def response(body: str, status: int = 200) -> requests.Response:
-    result = requests.Response()
-    result.status_code = status
-    result._content = body.encode()
-    return result
-
-
-def records(**fields: object) -> requests.Response:
-    return response(
-        json.dumps({key: json.dumps(value) for key, value in fields.items()})
-    )
-
-
-@pytest.fixture
-def post(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    mock = Mock()
-    monkeypatch.setattr(requests.Session, "post", mock)
-    return mock
-
-
 def test_direct_fetch_loads_student_details_after_login(
-    post: Mock, monkeypatch: pytest.MonkeyPatch
+    post: Mock, monkeypatch: pytest.MonkeyPatch, records, response
 ):
     client = Client("user", "pass", auto_login=False)
     challenge = CaptchaChallenge("token", b"", "image/png")
@@ -51,7 +29,7 @@ def test_direct_fetch_loads_student_details_after_login(
 
 
 def test_expired_session_discards_old_details(
-    post: Mock, monkeypatch: pytest.MonkeyPatch
+    post: Mock, monkeypatch: pytest.MonkeyPatch, records, response
 ):
     old_details = records(state=[{"RegID": 4, "Photo": "YQ==", "YearSem": 1}])
     post.side_effect = [old_details, old_details, records(data=[{"Subject": "Old"}])]
@@ -84,7 +62,7 @@ def test_expired_session_discards_old_details(
 
 
 def test_cookie_restore_requires_student_details(
-    post: Mock, monkeypatch: pytest.MonkeyPatch
+    post: Mock, monkeypatch: pytest.MonkeyPatch, response
 ):
     post.return_value = response("<html>Login required</html>")
     login = Mock()
@@ -96,7 +74,7 @@ def test_cookie_restore_requires_student_details(
     assert not client.is_logged_in
 
 
-def test_explicit_month_does_not_replace_cached_default(post: Mock):
+def test_explicit_month_does_not_replace_cached_default(post: Mock, records):
     details = records(state=[{"RegID": 4}])
     post.side_effect = [
         details,
@@ -126,7 +104,7 @@ def test_explicit_month_does_not_replace_cached_default(post: Mock):
     ],
 )
 def test_invalid_details_raise_client_error(
-    post: Mock, monkeypatch: pytest.MonkeyPatch, body: str, message: str
+    post: Mock, monkeypatch: pytest.MonkeyPatch, response, body: str, message: str
 ):
     monkeypatch.setattr(Client, "login", Mock(return_value=True))
     client = Client("user", "pass", auto_login=False)
